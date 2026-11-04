@@ -64,6 +64,7 @@
 
     <button id="startBtn" onclick="startListening()">Mulai Bicara</button>
     <button id="stopBtn" onclick="stopListening()" disabled>Berhenti</button>
+    <button onclick="sendTranscript()">Kirim ke SPEAK UP</button>
 
     <div id="status">Memeriksa dukungan browser...</div>
 
@@ -146,6 +147,39 @@
   function stopListening() {
     if (recognition) recognition.stop();
   }
+function sendTranscript() {
+  const speechText = finalText.trim();
+  const manualText = document.getElementById('manualText').value.trim();
+  const transcript = speechText || manualText;
+
+  if (!transcript) {
+    statusEl.textContent = 'Belum ada teks untuk dikirim.';
+    return;
+  }
+
+  if (window.opener && !window.opener.closed) {
+    window.opener.postMessage(
+      {
+        type: 'SPEAK_UP_TRANSCRIPT',
+        text: transcript
+      },
+      'https://script.google.com'
+    );
+
+    statusEl.textContent =
+      'Teks sudah dikirim. Silakan kembali ke halaman SPEAK UP.';
+  } else {
+    navigator.clipboard.writeText(transcript)
+      .then(() => {
+        statusEl.textContent =
+          'Teks disalin. Silakan tempel ke AI Coach SPEAK UP.';
+      })
+      .catch(() => {
+        statusEl.textContent =
+          'Tidak dapat mengirim otomatis. Silakan salin teks secara manual.';
+      });
+  }
+}
 </script>
 </body>
 </html>
