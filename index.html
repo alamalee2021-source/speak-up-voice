@@ -1,0 +1,151 @@
+
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SPEAK UP - Uji Mikrofon</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 650px;
+      margin: 40px auto;
+      padding: 20px;
+      color: #243047;
+      background: #f4f6fb;
+    }
+    .card {
+      background: white;
+      padding: 25px;
+      border-radius: 16px;
+      box-shadow: 0 4px 18px #0001;
+    }
+    button {
+      padding: 13px 20px;
+      margin: 6px 4px 6px 0;
+      border: 0;
+      border-radius: 9px;
+      background: #3157d5;
+      color: white;
+      font-size: 16px;
+      cursor: pointer;
+    }
+    button:disabled {
+      opacity: .5;
+      cursor: not-allowed;
+    }
+    #status {
+      margin: 18px 0;
+      font-weight: bold;
+    }
+    #result {
+      min-height: 110px;
+      padding: 15px;
+      background: #f0f3fa;
+      border-radius: 10px;
+      white-space: pre-wrap;
+    }
+    textarea {
+      box-sizing: border-box;
+      width: 100%;
+      min-height: 100px;
+      padding: 12px;
+      margin-top: 10px;
+      border: 1px solid #ccd2df;
+      border-radius: 9px;
+      font: inherit;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>🎙️ SPEAK UP</h1>
+    <p>Uji mikrofon dan pengenalan suara Bahasa Indonesia.</p>
+
+    <button id="startBtn" onclick="startListening()">Mulai Bicara</button>
+    <button id="stopBtn" onclick="stopListening()" disabled>Berhenti</button>
+
+    <div id="status">Memeriksa dukungan browser...</div>
+
+    <h3>Hasil pengenalan suara</h3>
+    <div id="result">Hasil ucapan Anda akan muncul di sini.</div>
+
+    <h3>Alternatif: ketik teks</h3>
+    <textarea id="manualText" placeholder="Anda tetap dapat mengetik jika fitur suara tidak tersedia."></textarea>
+  </div>
+
+<script>
+  const statusEl = document.getElementById('status');
+  const resultEl = document.getElementById('result');
+  const startBtn = document.getElementById('startBtn');
+  const stopBtn = document.getElementById('stopBtn');
+
+  const SpeechAPI =
+    window.SpeechRecognition || window.webkitSpeechRecognition;
+
+  let recognition;
+  let finalText = '';
+
+  if (!SpeechAPI) {
+    statusEl.textContent =
+      'Browser ini belum mendukung Speech Recognition. Silakan gunakan alternatif ketik atau coba browser lain.';
+    startBtn.disabled = true;
+  } else {
+    recognition = new SpeechAPI();
+    recognition.lang = 'id-ID';
+    recognition.continuous = true;
+    recognition.interimResults = true;
+
+    recognition.onstart = () => {
+      statusEl.textContent = 'Mikrofon aktif. Silakan berbicara.';
+      startBtn.disabled = true;
+      stopBtn.disabled = false;
+    };
+
+    recognition.onresult = (event) => {
+      let interimText = '';
+
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const transcript = event.results[i][0].transcript;
+        if (event.results[i].isFinal) {
+          finalText += transcript + ' ';
+        } else {
+          interimText += transcript;
+        }
+      }
+
+      resultEl.textContent = finalText + interimText;
+    };
+
+    recognition.onerror = (event) => {
+      statusEl.textContent =
+        'Terjadi kendala: ' + event.error +
+        '. Periksa izin mikrofon dan pengaturan browser.';
+    };
+
+    recognition.onend = () => {
+      startBtn.disabled = false;
+      stopBtn.disabled = true;
+      if (statusEl.textContent.includes('aktif')) {
+        statusEl.textContent = 'Perekaman selesai.';
+      }
+    };
+  }
+
+  function startListening() {
+    if (!recognition) return;
+    finalText = '';
+    resultEl.textContent = '';
+    try {
+      recognition.start();
+    } catch (error) {
+      statusEl.textContent = 'Tidak dapat memulai mikrofon: ' + error.message;
+    }
+  }
+
+  function stopListening() {
+    if (recognition) recognition.stop();
+  }
+</script>
+</body>
+</html>
