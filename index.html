@@ -1,185 +1,129 @@
-
 <!DOCTYPE html>
 <html lang="id">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>SPEAK UP - Uji Mikrofon</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      max-width: 650px;
-      margin: 40px auto;
-      padding: 20px;
-      color: #243047;
-      background: #f4f6fb;
-    }
-    .card {
-      background: white;
-      padding: 25px;
-      border-radius: 16px;
-      box-shadow: 0 4px 18px #0001;
-    }
-    button {
-      padding: 13px 20px;
-      margin: 6px 4px 6px 0;
-      border: 0;
-      border-radius: 9px;
-      background: #3157d5;
-      color: white;
-      font-size: 16px;
-      cursor: pointer;
-    }
-    button:disabled {
-      opacity: .5;
-      cursor: not-allowed;
-    }
-    #status {
-      margin: 18px 0;
-      font-weight: bold;
-    }
-    #result {
-      min-height: 110px;
-      padding: 15px;
-      background: #f0f3fa;
-      border-radius: 10px;
-      white-space: pre-wrap;
-    }
-    textarea {
-      box-sizing: border-box;
-      width: 100%;
-      min-height: 100px;
-      padding: 12px;
-      margin-top: 10px;
-      border: 1px solid #ccd2df;
-      border-radius: 9px;
-      font: inherit;
-    }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SPEAK UP - Mikrofon</title>
+<style>
+  body{font-family:system-ui,-apple-system,sans-serif;max-width:520px;margin:40px auto;padding:20px;background:#f4f6fa;color:#182536}
+  h1{font-size:20px;margin-bottom:20px;color:#142b48}
+  #status{font-size:13px;color:#66758a;margin-bottom:12px;min-height:20px}
+  #transcript{width:100%;height:220px;border:1px solid #d6dee8;border-radius:8px;padding:12px;font-size:16px;line-height:1.5;background:#fff;margin-bottom:16px}
+  .btn-row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px}
+  button{padding:10px 16px;border:none;border-radius:8px;font-weight:600;cursor:pointer;font-size:14px}
+  .btn-start{background:#142b48;color:#fff}
+  .btn-stop{background:#b42318;color:#fff}
+  .btn-send{background:#d6ad5c;color:#172b43}
+  button:disabled{opacity:0.5;cursor:not-allowed}
+  .hint{font-size:12px;color:#66758a;border-top:1px solid #e3e8ef;padding-top:12px}
+</style>
 </head>
 <body>
-  <div class="card">
-    <h1>🎙️ SPEAK UP</h1>
-    <p>Uji mikrofon dan pengenalan suara Bahasa Indonesia.</p>
-
-    <button id="startBtn" onclick="startListening()">Mulai Bicara</button>
-    <button id="stopBtn" onclick="stopListening()" disabled>Berhenti</button>
-    <button onclick="sendTranscript()">Kirim ke SPEAK UP</button>
-
-    <div id="status">Memeriksa dukungan browser...</div>
-
-    <h3>Hasil pengenalan suara</h3>
-    <div id="result">Hasil ucapan Anda akan muncul di sini.</div>
-
-    <h3>Alternatif: ketik teks</h3>
-    <textarea id="manualText" placeholder="Anda tetap dapat mengetik jika fitur suara tidak tersedia."></textarea>
-  </div>
+<h1>🎙️ SPEAK UP - Mikrofon</h1>
+<div id="status">Klik "Mulai Bicara" untuk mulai merekam.</div>
+<textarea id="transcript" placeholder="Hasil ucapan akan muncul di sini..."></textarea>
+<div class="btn-row">
+  <button id="btnStart" class="btn-start" onclick="startRec()">Mulai Bicara</button>
+  <button id="btnStop" class="btn-stop" onclick="stopRec()" disabled>Berhenti</button>
+  <button id="btnSend" class="btn-send" onclick="copyToClipboard()" disabled>Kirim ke SPEAK UP</button>
+</div>
+<p class="hint">Setelah klik "Kirim ke SPEAK UP", teks akan disalin ke clipboard. Buka halaman SPEAK UP utama, lalu tempel (paste) ke kolom naskah.</p>
 
 <script>
-  const statusEl = document.getElementById('status');
-  const resultEl = document.getElementById('result');
-  const startBtn = document.getElementById('startBtn');
-  const stopBtn = document.getElementById('stopBtn');
-
-  const SpeechAPI =
-    window.SpeechRecognition || window.webkitSpeechRecognition;
-
-  let recognition;
+  let recognition = null;
   let finalText = '';
 
-  if (!SpeechAPI) {
-    statusEl.textContent =
-      'Browser ini belum mendukung Speech Recognition. Silakan gunakan alternatif ketik atau coba browser lain.';
-    startBtn.disabled = true;
-  } else {
+  function init() {
+    const SpeechAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechAPI) {
+      document.getElementById('status').textContent = 'Browser tidak mendukung pengenalan suara.';
+      return false;
+    }
     recognition = new SpeechAPI();
     recognition.lang = 'id-ID';
     recognition.continuous = true;
     recognition.interimResults = true;
 
     recognition.onstart = () => {
-      statusEl.textContent = 'Mikrofon aktif. Silakan berbicara.';
-      startBtn.disabled = true;
-      stopBtn.disabled = false;
+      document.getElementById('status').textContent = 'Merekam... bicara sekarang.';
+      document.getElementById('btnStart').disabled = true;
+      document.getElementById('btnStop').disabled = false;
+      document.getElementById('btnSend').disabled = true;
     };
 
     recognition.onresult = (event) => {
-      let interimText = '';
-
+      let interim = '';
+      let fin = '';
       for (let i = event.resultIndex; i < event.results.length; i++) {
-        const transcript = event.results[i][0].transcript;
-        if (event.results[i].isFinal) {
-          finalText += transcript + ' ';
-        } else {
-          interimText += transcript;
-        }
+        const t = event.results[i][0].transcript;
+        if (event.results[i].isFinal) fin += t;
+        else interim += t;
       }
-
-      resultEl.textContent = finalText + interimText;
+      if (fin) {
+        finalText = (finalText ? finalText + ' ' : '') + fin;
+        document.getElementById('transcript').value = finalText + (interim ? ' ' + interim : '');
+      } else {
+        document.getElementById('transcript').value = finalText + (interim ? ' ' + interim : '');
+      }
+      document.getElementById('status').textContent = interim ? 'Mendengar: ' + interim : 'Suara ditangkap.';
     };
 
-    recognition.onerror = (event) => {
-      statusEl.textContent =
-        'Terjadi kendala: ' + event.error +
-        '. Periksa izin mikrofon dan pengaturan browser.';
+    recognition.onerror = (e) => {
+      document.getElementById('status').textContent = 'Error: ' + e.error;
+      stopRec();
     };
 
     recognition.onend = () => {
-      startBtn.disabled = false;
-      stopBtn.disabled = true;
-      if (statusEl.textContent.includes('aktif')) {
-        statusEl.textContent = 'Perekaman selesai.';
-      }
+      document.getElementById('btnStart').disabled = false;
+      document.getElementById('btnStop').disabled = true;
+      if (finalText) document.getElementById('btnSend').disabled = false;
     };
+
+    return true;
   }
 
-  function startListening() {
-    if (!recognition) return;
-    finalText = '';
-    resultEl.textContent = '';
+  function startRec() {
+    if (!recognition && !init()) return;
     try {
+      finalText = '';
+      document.getElementById('transcript').value = '';
       recognition.start();
-    } catch (error) {
-      statusEl.textContent = 'Tidak dapat memulai mikrofon: ' + error.message;
+    } catch (e) {
+      document.getElementById('status').textContent = 'Gagal memulai: ' + e.message;
     }
   }
 
-  function stopListening() {
+  function stopRec() {
     if (recognition) recognition.stop();
   }
-function sendTranscript() {
-  const speechText = finalText.trim();
-  const manualText = document.getElementById('manualText').value.trim();
-  const transcript = speechText || manualText;
 
-  if (!transcript) {
-    statusEl.textContent = 'Belum ada teks untuk dikirim.';
-    return;
+  async function copyToClipboard() {
+    const text = document.getElementById('transcript').value.trim();
+    if (!text) {
+      document.getElementById('status').textContent = 'Teks kosong.';
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(text);
+      document.getElementById('status').textContent = '✓ Teks disalin ke clipboard! Tempel di halaman SPEAK UP utama.';
+      document.getElementById('btnSend').textContent = '✓ Disalin';
+      setTimeout(() => { document.getElementById('btnSend').textContent = 'Kirim ke SPEAK UP'; }, 2000);
+    } catch (err) {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      try {
+        document.execCommand('copy');
+        document.getElementById('status').textContent = 'Teks disalin (fallback).';
+      } catch (e2) {
+        document.getElementById('status').textContent = 'Gagal menyalin.';
+      }
+      document.body.removeChild(ta);
+    }
   }
-
-  if (window.opener && !window.opener.closed) {
-    window.opener.postMessage(
-      {
-        type: 'SPEAK_UP_TRANSCRIPT',
-        text: transcript
-      },
-      'https://script.google.com'
-    );
-
-    statusEl.textContent =
-      'Teks sudah dikirim. Silakan kembali ke halaman SPEAK UP.';
-  } else {
-    navigator.clipboard.writeText(transcript)
-      .then(() => {
-        statusEl.textContent =
-          'Teks disalin. Silakan tempel ke AI Coach SPEAK UP.';
-      })
-      .catch(() => {
-        statusEl.textContent =
-          'Tidak dapat mengirim otomatis. Silakan salin teks secara manual.';
-      });
-  }
-}
 </script>
 </body>
 </html>
