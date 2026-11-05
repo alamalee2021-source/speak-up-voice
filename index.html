@@ -3,127 +3,90 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>SPEAK UP - Mikrofon</title>
+<title>SPEAK UP JOGJA — Audio Practice Recorder</title>
 <style>
-  body{font-family:system-ui,-apple-system,sans-serif;max-width:520px;margin:40px auto;padding:20px;background:#f4f6fa;color:#182536}
-  h1{font-size:20px;margin-bottom:20px;color:#142b48}
-  #status{font-size:13px;color:#66758a;margin-bottom:12px;min-height:20px}
-  #transcript{width:100%;height:220px;border:1px solid #d6dee8;border-radius:8px;padding:12px;font-size:16px;line-height:1.5;background:#fff;margin-bottom:16px}
-  .btn-row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px}
-  button{padding:10px 16px;border:none;border-radius:8px;font-weight:600;cursor:pointer;font-size:14px}
-  .btn-start{background:#142b48;color:#fff}
-  .btn-stop{background:#b42318;color:#fff}
-  .btn-send{background:#d6ad5c;color:#172b43}
-  button:disabled{opacity:0.5;cursor:not-allowed}
-  .hint{font-size:12px;color:#66758a;border-top:1px solid #e3e8ef;padding-top:12px}
+:root{--navy:#142b48;--gold:#d6ad5c;--bg:#f4f6fa;--ink:#182536;--muted:#66758a;--line:#e3e8ef;--red:#b42318;--green:#18845b}
+*{box-sizing:border-box}body{font-family:system-ui,-apple-system,sans-serif;max-width:680px;margin:28px auto;padding:18px;background:var(--bg);color:var(--ink)}
+.card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:24px;box-shadow:0 8px 28px #142b4810}h1{font-size:22px;color:var(--navy);margin:0 0 8px}.muted{color:var(--muted);font-size:13px;line-height:1.55}#status{margin:18px 0;padding:13px;border-radius:10px;background:#f2f5f9;color:var(--navy);min-height:48px;font-size:14px;line-height:1.5}
+.row{display:flex;gap:10px;flex-wrap:wrap}button{border:0;border-radius:9px;padding:12px 16px;font-size:14px;font-weight:700;cursor:pointer}button:disabled{opacity:.45;cursor:not-allowed}.start{background:var(--navy);color:#fff}.stop{background:var(--red);color:#fff}.send{background:var(--gold);color:#172b43}.timer{font-size:34px;font-weight:800;color:var(--navy);margin:16px 0}.meter{height:8px;border-radius:20px;background:#e9eef4;overflow:hidden;margin:10px 0 18px}.meter span{display:block;height:100%;width:0;background:var(--green);transition:width .2s}.hint{border-top:1px solid var(--line);padding-top:14px;margin-top:20px}.ok{color:var(--green);font-weight:700}
 </style>
 </head>
 <body>
-<h1>🎙️ SPEAK UP - Mikrofon</h1>
-<div id="status">Klik "Mulai Bicara" untuk mulai merekam.</div>
-<textarea id="transcript" placeholder="Hasil ucapan akan muncul di sini..."></textarea>
-<div class="btn-row">
-  <button id="btnStart" class="btn-start" onclick="startRec()">Mulai Bicara</button>
-  <button id="btnStop" class="btn-stop" onclick="stopRec()" disabled>Berhenti</button>
-  <button id="btnSend" class="btn-send" onclick="copyToClipboard()" disabled>Kirim ke SPEAK UP</button>
+<div class="card">
+  <h1>🎙️ SPEAK UP JOGJA — Ruang Rekaman</h1>
+  <p class="muted">Rekam latihan public speaking Anda. Audio asli akan dikirim ke SPEAK UP untuk dianalisis oleh Gemini. Pastikan jendela ini dibuka dari tombol Practice Room.</p>
+  <div id="status">Memeriksa dukungan perekaman...</div>
+  <div class="timer" id="timer">00:00</div>
+  <div class="meter"><span id="meterBar"></span></div>
+  <div class="row">
+    <button id="startBtn" class="start" onclick="startRecording()">Mulai Rekam</button>
+    <button id="stopBtn" class="stop" onclick="stopRecording()" disabled>Selesai & Kirim ke AI</button>
+  </div>
+  <p class="muted hint">Tips: letakkan perangkat sekitar 30–50 cm dari pembicara, hindari kebisingan, dan rekam satu pidato utuh. Batas ukuran audio sekitar 7 MB per sesi. Jangan tutup jendela sebelum pengiriman selesai.</p>
 </div>
-<p class="hint">Setelah klik "Kirim ke SPEAK UP", teks akan disalin ke clipboard. Buka halaman SPEAK UP utama, lalu tempel (paste) ke kolom naskah.</p>
-
 <script>
-  let recognition = null;
-  let finalText = '';
-
-  function init() {
-    const SpeechAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechAPI) {
-      document.getElementById('status').textContent = 'Browser tidak mendukung pengenalan suara.';
-      return false;
-    }
-    recognition = new SpeechAPI();
-    recognition.lang = 'id-ID';
-    recognition.continuous = true;
-    recognition.interimResults = true;
-
-    recognition.onstart = () => {
-      document.getElementById('status').textContent = 'Merekam... bicara sekarang.';
-      document.getElementById('btnStart').disabled = true;
-      document.getElementById('btnStop').disabled = false;
-      document.getElementById('btnSend').disabled = true;
-    };
-
-    recognition.onresult = (event) => {
-      let interim = '';
-      let fin = '';
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        const t = event.results[i][0].transcript;
-        if (event.results[i].isFinal) fin += t;
-        else interim += t;
-      }
-      if (fin) {
-        finalText = (finalText ? finalText + ' ' : '') + fin;
-        document.getElementById('transcript').value = finalText + (interim ? ' ' + interim : '');
-      } else {
-        document.getElementById('transcript').value = finalText + (interim ? ' ' + interim : '');
-      }
-      document.getElementById('status').textContent = interim ? 'Mendengar: ' + interim : 'Suara ditangkap.';
-    };
-
-    recognition.onerror = (e) => {
-      document.getElementById('status').textContent = 'Error: ' + e.error;
-      stopRec();
-    };
-
-    recognition.onend = () => {
-      document.getElementById('btnStart').disabled = false;
-      document.getElementById('btnStop').disabled = true;
-      if (finalText) document.getElementById('btnSend').disabled = false;
-    };
-
-    return true;
+let stream=null, recorder=null, chunks=[], startedAt=0, timerHandle=null, audioMime='audio/mp4';
+const $=id=>document.getElementById(id);
+function setStatus(message){$('status').textContent=message;}
+function fmt(seconds){const m=String(Math.floor(seconds/60)).padStart(2,'0');const s=String(seconds%60).padStart(2,'0');return m+':'+s;}
+function chooseMime(){
+  const options=['audio/mp4;codecs=mp4a.40.2','audio/mp4','audio/webm;codecs=opus','audio/webm'];
+  if(!window.MediaRecorder)return '';
+  for(const type of options){try{if(MediaRecorder.isTypeSupported(type))return type;}catch(e){}}
+  return '';
+}
+function sendToParent(payload){
+  if(!window.opener){setStatus('Jendela ini tidak dibuka dari Practice Room. Tutup halaman ini dan buka kembali melalui tombol Buka ruang rekaman.');return false;}
+  window.opener.postMessage(payload,'*');return true;
+}
+window.addEventListener('load',()=>{
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia||!window.MediaRecorder){
+    setStatus('Browser ini belum mendukung perekaman audio MediaRecorder. Perbarui Safari atau gunakan browser terbaru.');$('startBtn').disabled=true;return;
   }
-
-  function startRec() {
-    if (!recognition && !init()) return;
-    try {
-      finalText = '';
-      document.getElementById('transcript').value = '';
-      recognition.start();
-    } catch (e) {
-      document.getElementById('status').textContent = 'Gagal memulai: ' + e.message;
-    }
+  setStatus('Siap. Tekan Mulai Rekam, lalu izinkan akses mikrofon jika diminta.');
+  sendToParent({type:'SPEAKUP_RECORDER_READY'});
+});
+async function startRecording(){
+  try{
+    $('startBtn').disabled=true;setStatus('Meminta izin mikrofon...');
+    stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true},video:false});
+    const selected=chooseMime();
+    const options={audioBitsPerSecond:64000};if(selected)options.mimeType=selected;
+    recorder=new MediaRecorder(stream,options);audioMime=recorder.mimeType||selected||'audio/mp4';chunks=[];
+    recorder.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data);};
+    recorder.onerror=e=>{setStatus('Kesalahan perekaman: '+(e.error&&e.error.message?e.error.message:'tidak diketahui'));cleanup();};
+    recorder.onstop=handleRecordingStopped;
+    recorder.start(1000);startedAt=Date.now();$('stopBtn').disabled=false;setStatus('Merekam... Bicara dengan jelas dan gunakan jeda secara alami.');
+    timerHandle=setInterval(()=>{$('timer').textContent=fmt(Math.floor((Date.now()-startedAt)/1000));},250);
+  }catch(err){
+    $('startBtn').disabled=false;$('stopBtn').disabled=true;
+    const msg=err&&err.name==='NotAllowedError'?'Izin mikrofon ditolak. Buka pengaturan Safari untuk situs ini dan izinkan Microphone.':(err.message||String(err));
+    setStatus('Tidak dapat memulai rekaman: '+msg);sendToParent({type:'SPEAKUP_RECORDER_ERROR',message:msg});
   }
-
-  function stopRec() {
-    if (recognition) recognition.stop();
-  }
-
-  async function copyToClipboard() {
-    const text = document.getElementById('transcript').value.trim();
-    if (!text) {
-      document.getElementById('status').textContent = 'Teks kosong.';
-      return;
-    }
-    try {
-      await navigator.clipboard.writeText(text);
-      document.getElementById('status').textContent = '✓ Teks disalin ke clipboard! Tempel di halaman SPEAK UP utama.';
-      document.getElementById('btnSend').textContent = '✓ Disalin';
-      setTimeout(() => { document.getElementById('btnSend').textContent = 'Kirim ke SPEAK UP'; }, 2000);
-    } catch (err) {
-      const ta = document.createElement('textarea');
-      ta.value = text;
-      ta.style.position = 'fixed';
-      ta.style.opacity = '0';
-      document.body.appendChild(ta);
-      ta.select();
-      try {
-        document.execCommand('copy');
-        document.getElementById('status').textContent = 'Teks disalin (fallback).';
-      } catch (e2) {
-        document.getElementById('status').textContent = 'Gagal menyalin.';
-      }
-      document.body.removeChild(ta);
-    }
-  }
+}
+function stopRecording(){
+  if(!recorder||recorder.state==='inactive')return;
+  $('stopBtn').disabled=true;setStatus('Mengakhiri rekaman dan menyiapkan audio...');recorder.stop();
+}
+async function handleRecordingStopped(){
+  clearInterval(timerHandle);timerHandle=null;
+  const duration=Math.max(1,Math.round((Date.now()-startedAt)/1000));
+  if(stream)stream.getTracks().forEach(t=>t.stop());stream=null;
+  const blob=new Blob(chunks,{type:audioMime});chunks=[];
+  $('timer').textContent=fmt(duration);
+  if(!blob.size){$('startBtn').disabled=false;setStatus('Rekaman kosong. Silakan ulangi.');return;}
+  if(blob.size>7*1024*1024){$('startBtn').disabled=false;setStatus('Ukuran audio '+(blob.size/1024/1024).toFixed(1)+' MB, melebihi batas 7 MB. Rekam lebih singkat atau turunkan durasi.');return;}
+  setStatus('Mengirim audio ('+(blob.size/1024).toFixed(0)+' KB) ke SPEAK UP...');
+  try{
+    const dataUrl=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=reject;reader.readAsDataURL(blob);});
+    const base64=String(dataUrl).split(',')[1]||'';
+    const ok=sendToParent({type:'SPEAKUP_AUDIO_READY',audioBase64:base64,mimeType:(blob.type||audioMime).split(';')[0],durationSeconds:duration});
+    if(ok){setStatus('Audio terkirim ke SPEAK UP. Tunggu proses evaluasi Gemini pada halaman utama.');$('startBtn').disabled=true;}
+  }catch(err){$('startBtn').disabled=false;setStatus('Gagal menyiapkan audio: '+err.message);}
+}
+function cleanup(){clearInterval(timerHandle);timerHandle=null;if(stream)stream.getTracks().forEach(t=>t.stop());stream=null;$('startBtn').disabled=false;$('stopBtn').disabled=true;}
+window.addEventListener('message',event=>{if(event.data&&event.data.type==='SPEAKUP_EVALUATION_DONE'){setStatus('Evaluasi selesai. Anda dapat menutup jendela ini atau kembali ke Practice Room.');}});
+window.addEventListener('beforeunload',cleanup);
 </script>
 </body>
 </html>
